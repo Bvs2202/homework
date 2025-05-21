@@ -12,14 +12,9 @@
 #define SIZE_LISTEN 5
 
 int sockfd = -1;
-int new_sockfd = -1;
 
 void clean(int signum)
 {
-	if (new_sockfd != -1)
-	{
-		close(new_sockfd);
-	}
 	if (sockfd != -1)
 	{
 		close(sockfd);
@@ -56,7 +51,7 @@ int main()
 		exit(1);
 	}
 
-	serv_addr.sin_family = SOCK_DGRAM;
+	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serv_addr.sin_port = htons(PORT);
 
@@ -86,7 +81,6 @@ int main()
 	}
 	printf("Отправлено измененное сообщение: %s\n", buffer);
 
-	close(new_sockfd);
 	close(sockfd);
 
 	return 0;

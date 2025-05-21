@@ -13,14 +13,9 @@
 #define SERVER_PATH "/tmp/my_server_sock"
 
 int sockfd = -1;
-int new_sockfd = -1;
 
 void clean(int signum)
 {
-	if (new_sockfd != -1)
-	{
-		close(new_sockfd);
-	}
 	if (sockfd != -1)
 	{
 		close(sockfd);
@@ -88,7 +83,6 @@ int main()
 	}
 	printf("Отправлено измененное сообщение: %s\n", buffer);
 
-	close(new_sockfd);
 	close(sockfd);
 	unlink(SERVER_PATH);
 
