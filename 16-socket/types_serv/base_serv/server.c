@@ -22,7 +22,11 @@ void *send_time(void *arg)
 
     while(1)
     {
-        recv(new_sockfd, buff, sizeof(buff), 0);
+        byte_in = recv(new_sockfd, buff, sizeof(buff), 0);
+        if (byte_in == 0)
+        {
+            break;
+        }
 
         time(&cur_time);
         time_info = localtime(&cur_time);
@@ -30,6 +34,8 @@ void *send_time(void *arg)
 
         send(new_sockfd, buff, strlen(buff), 0);
     }
+
+    pthread_exit(NULL);
 }
 
 int main()

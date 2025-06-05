@@ -18,7 +18,7 @@ int main()
 	ssize_t byte_in;
 	char buff[SIZE_BUFF] = {0};
 	char input_cmd[SIZE_BUFF] = {0};
-	char *msg = "Отправь сколько время!";
+	char *msg = "Привет сервер я TCP!";
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == -1)
@@ -37,24 +37,19 @@ int main()
 		return 1;
 	}
 
-	while (1)
+	printf("Привет, я TCP клиент.\n");
+
+	send(sockfd, msg, strlen(msg), 0);
+	printf("Сообщение отправлено!\n");
+	byte_in = recv(sockfd, buff, sizeof(buff) - 1, 0);
+	if (byte_in <= 0)
 	{
-		printf("Нажмите любую клавишу, что бы узнать время(нажмите \"q\" для выхода): ");
-		memset(input_cmd, 0, sizeof(input_cmd));
-		fgets(input_cmd, sizeof(input_cmd), stdin);
-		input_cmd[strcspn(input_cmd, "\n")] = '\0';
-		if (strncmp(input_cmd, "q", sizeof(input_cmd)) == 0)
-		{
-			break;
-		}
-		send(sockfd, msg, strlen(msg), 0);
-		printf("Сообщение отправлено!\n");
-
-		byte_in = recv(sockfd, buff, sizeof(buff) - 1, 0);
-		buff[byte_in] = '\0';
-
-		printf("Время: %s\n", buff);
+		printf("Сервер отключился!\n");
+		close(sockfd);
+		return 0;
 	}
+	buff[byte_in] = '\0';
+	printf("Сообщение от сервера: %s\n", buff);
 
 	close(sockfd);
 	printf("Завершение программы...Досвидание!\n\n");

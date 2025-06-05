@@ -31,11 +31,7 @@ int main()
 	serv_addr.sin_port = htons(PORT_SERV);
 	inet_pton(AF_INET, IP_SERV, &serv_addr.sin_addr);
 
-	if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
-	{
-		close(sockfd);
-		return 1;
-	}
+	connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 
 	while (1)
 	{
@@ -51,6 +47,11 @@ int main()
 		printf("Сообщение отправлено!\n");
 
 		byte_in = recv(sockfd, buff, sizeof(buff) - 1, 0);
+		if (byte_in <= 0)
+		{
+			printf("Сервер отключился!\n");
+			break;
+		}
 		buff[byte_in] = '\0';
 
 		printf("Время: %s\n", buff);

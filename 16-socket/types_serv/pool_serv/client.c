@@ -35,10 +35,11 @@ int main()
 
     while (1)
     {
-        printf("Нажмите любую клавишу, что бы узнать время(нажмите \"В\" для выхода): ");
+        printf("Нажмите любую клавишу, что бы узнать время(нажмите \"q\" для выхода): ");
         memset(input_cmd, 0, sizeof(input_cmd));
         fgets(input_cmd, sizeof(input_cmd), stdin);
-        if (strncmp(input_cmd, "В", sizeof(input_cmd)) == 0)
+        input_cmd[strcspn(input_cmd, "\n")] = '\0';
+        if (strncmp(input_cmd, "q", sizeof(input_cmd)) == 0)
         {
             break;
         }

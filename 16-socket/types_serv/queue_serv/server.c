@@ -12,10 +12,61 @@
 
 #define SIZE_BUFF 256
 #define POOL_THREAD 5
+#define SIZE_QUEUE 16
 
-int client_sockfd = -1;
+struct queue_client {
+	int queue_sockfd[SIZE_QUEUE];
+	int head;
+	int tail;
+};
+
+struct queue_client queue_client = {0};
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void init_queue(struct queue_client *queue_client)
+{
+	queue_client->head = 0;
+	queue_client->tail = 0;
+}
+
+int is_empty_queue(void)
+{
+	return queue_client.head == queue_client.tail;
+}
+
+int full_queue(void)
+{
+	return (queue_client.tail + 1) % SIZE_QUEUE == queue_client.head;
+}
+
+
+int add_sockfd(int sockfd)
+{
+	if (full_queue())
+	{
+		return 1;
+	}
+
+	queue_client.queue_sockfd[queue_client.tail] = sockfd;
+	queue_client.tail = (queue_client.tail + 1) % SIZE_QUEUE;
+
+	return 0;
+}
+
+int de_sockfd(void)
+{
+	int fd;
+	if (is_empty_queue())
+	{
+		return 1;
+	}
+
+	fd = queue_client.queue_sockfd[queue_client.head];
+	queue_client.head = (queue_client.head + 1) % SIZE_QUEUE;
+
+	return fd;
+}
 
 void *send_time(void *arg)
 {
@@ -28,12 +79,11 @@ void *send_time(void *arg)
 	while(1)
 	{
 		pthread_mutex_lock(&mutex);
-		while (client_sockfd == -1)
+		while (queue_client.head == queue_client.tail)
 		{
 			pthread_cond_wait(&cond, &mutex);
 		}
-		thread_sockfd = client_sockfd;
-		client_sockfd = -1;
+		thread_sockfd = de_sockfd();
 		pthread_mutex_unlock(&mutex);
 
 		while (1)
@@ -96,6 +146,7 @@ int main()
 		return 1;
 	}
 
+	init_queue(&queue_client);
 	create_pool_serv();
 
 	len_addr = sizeof(client_addr);
@@ -111,7 +162,12 @@ int main()
 		}
 
 		pthread_mutex_lock(&mutex);
-		client_sockfd = new_sockfd;
+		if (add_sockfd(new_sockfd) != 0)
+		{
+			printf("Ошибка в доавлении нового сокета\n");
+			pthread_mutex_unlock(&mutex);
+			break;
+		}
 		pthread_cond_signal(&cond);
 		pthread_mutex_unlock(&mutex);
 	}
