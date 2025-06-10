@@ -10,14 +10,28 @@
 #include <linux/if_packet.h>
 #include <net/if.h>
 
+#include "common.h"
+
 #define IP_SORCE "192.168.0.197"
 
-#include "common.h"
+#define MAX_CLIENT 36
+
+struct client_data {
+	int num;
+	char ip_client[SIZE_IP];
+};
+
+struct list {
+	struct client_data client;
+	struct list *next;
+};
 
 int sockfd = -1;
 
 int main()
 {
+	struct list *head;
+	struct list *list_client;
 	struct packet packet_send;
 	struct packet *packet_in;
 	struct sockaddr_ll server_addr, client_addr;
@@ -66,7 +80,7 @@ int main()
 		strncpy(packet_send.buff, buff, sizeof(packet_send.buff));
 
 		strncpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
-		strncpy(dest_ip, packet_in->header_ip.source_ip, SIZE_IP);
+		strncpy(dest_ip, &packet_in->header_ip.source_ip, SIZE_IP);
 
 		memcpy(packet_send.header_eathernet.dest_mac, dest_mac, SIZE_MAC);
 		memcpy(packet_send.header_eathernet.source_mac, source_mac, SIZE_MAC);
@@ -79,15 +93,11 @@ int main()
 		packet_send.header_ip.flags_offset = 0;
 		packet_send.header_ip.ttl = 255;
 		packet_send.header_ip.transport_proto = IPPROTO_UDP;
-		if (inet_pton(AF_INET, dest_ip, &packet_send.header_ip.dest_ip) <= 0)
-		{
-			perror("inet_pton");
-			clean(1);
-		}
+		packet_send.header_ip.dest_ip = packet_in->header_ip.source_ip;
+
 		if (inet_pton(AF_INET, IP_SORCE, &packet_send.header_ip.source_ip) <= 0)
 		{
 			perror("inet_pton");
-			clean(1);
 		}
 		ptr_pct = (unsigned short *)&packet_send.header_ip;
 		for (int i = 0; i < 10; i++)
@@ -99,15 +109,14 @@ int main()
 		csum = ~csum;
 		packet_send.header_ip.checksum = (csum & 0xFFFF);
 
-		packet_send.header_udp.source_port = htons(7777);
-		packet_send.header_udp.dest_port = htons(PORT_SERVER);
+		packet_send.header_udp.source_port = htons(PORT_SERVER);
+		packet_send.header_udp.dest_port = htons(packet_in->header_udp.source_port);
 		packet_send.header_udp.length = htons(sizeof(packet_send.header_udp) + strlen(packet_send.buff));
 
 		server_addr.sll_family = AF_PACKET;
 		server_addr.sll_halen = SIZE_ADDR_SLL;
 		memcpy(server_addr.sll_addr, dest_mac, SIZE_MAC);
-		server_addr.sll_ifindex = if_nametoindex("enp34s0");
-
+		server_addr.sll_ifindex = if_nametoindex("wlp4s0");
 
 		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
 		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));

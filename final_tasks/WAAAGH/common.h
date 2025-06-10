@@ -5,7 +5,7 @@
 #include "common.h"
 
 #define SIZE_ADDR_SLL 6
-#define SIZE_IP 32
+#define SIZE_IP 4
 #define SIZE_MAC 6
 #define PORT_SERVER 8080
 #define PORT_CLIENT 7777

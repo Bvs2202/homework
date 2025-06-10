@@ -12,7 +12,7 @@
 
 #include "common.h"
 
-#define IP_DEST "192.168.0.153"
+#define IP_DEST "192.168.1.180"
 #define IP_SORCE "192.168.0.197"
 
 int sockfd = -1;
@@ -27,7 +27,7 @@ int main()
 	int byte_in;
 	char buff[SIZE_BUFF] = {0};
 	char *name_iface = "enp34s0";
-	unsigned char dest_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
+	unsigned char dest_mac[SIZE_MAC] = {0x5c, 0x3a, 0x45, 0x9e, 0x5e, 0x2b};
 	unsigned char source_mac[SIZE_MAC] = {0x04, 0x7c, 0x16, 0xb4, 0xb7, 0xc2};
 	unsigned short *ptr_pct;
 	unsigned int csum = 0, tmp_csum = 0;
