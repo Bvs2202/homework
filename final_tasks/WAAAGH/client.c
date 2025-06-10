@@ -12,7 +12,7 @@
 
 #include "common.h"
 
-#define IP_DEST "192.168.1.180"
+#define IP_DEST "192.168.0.153"
 #define IP_SORCE "192.168.0.197"
 
 int sockfd = -1;
@@ -27,7 +27,7 @@ int main()
 	int byte_in;
 	char buff[SIZE_BUFF] = {0};
 	char *name_iface = "enp34s0";
-	unsigned char dest_mac[SIZE_MAC] = {0x5c, 0x3a, 0x45, 0x9e, 0x5e, 0x2b};
+	unsigned char dest_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
 	unsigned char source_mac[SIZE_MAC] = {0x04, 0x7c, 0x16, 0xb4, 0xb7, 0xc2};
 	unsigned short *ptr_pct;
 	unsigned int csum = 0, tmp_csum = 0;
@@ -61,12 +61,12 @@ int main()
 		if (inet_pton(AF_INET, IP_SORCE, &packet_send.header_ip.source_ip) <= 0)
 		{
 			perror("inet_pton");
-			clean(1);
+			return 1;
 		}
 		if (inet_pton(AF_INET, IP_DEST, &packet_send.header_ip.dest_ip) <= 0)
 		{
 			perror("inet_pton");
-			clean(1);
+			return 1;
 		}
 		ptr_pct = (unsigned short *)&packet_send.header_ip;
 		for (int i = 0; i < 10; i++)
@@ -85,13 +85,13 @@ int main()
 		server_addr.sll_family = AF_PACKET;
 		server_addr.sll_halen = SIZE_ADDR_SLL;
 		memcpy(server_addr.sll_addr, dest_mac, SIZE_MAC);
-		server_addr.sll_ifindex = if_nametoindex("enp34s0");
+		server_addr.sll_ifindex = if_nametoindex(name_iface);
 
 
 		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
 		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
-		if (strncmp(packet_send.buff, "q", sizeof(packet_send.buff)))
+		if (strncmp(packet_send.buff, "q", sizeof(packet_send.buff)) == 0)
 		{
 			break;
 		}
