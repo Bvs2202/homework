@@ -19,7 +19,7 @@ int sockfd = -1;
 
 int main()
 {
-	struct packet packet_send;
+	struct packet packet_send = {0};
 	struct packet *packet_in;
 	struct sockaddr_ll server_addr, client_addr;
 	socklen_t len_addr;
@@ -69,6 +69,7 @@ int main()
 			return 1;
 		}
 		ptr_pct = (unsigned short *)&packet_send.header_ip;
+		csum = 0; tmp_csum = 0;
 		for (int i = 0; i < 10; i++)
 		{
 			csum = csum + ptr_pct[i];
@@ -91,7 +92,7 @@ int main()
 		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
 		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
-		if (strncmp(packet_send.buff, "q", sizeof(packet_send.buff)) == 0)
+		if (strcmp(packet_send.buff, "q") == 0)
 		{
 			break;
 		}

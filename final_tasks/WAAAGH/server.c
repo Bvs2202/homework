@@ -80,7 +80,7 @@ int main()
 		strncpy(packet_send.buff, buff, sizeof(packet_send.buff));
 
 		strncpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
-		strncpy(dest_ip, &packet_in->header_ip.source_ip, SIZE_IP);
+		memcpy(dest_ip, &packet_in->header_ip.source_ip, SIZE_IP);
 
 		memcpy(packet_send.header_eathernet.dest_mac, dest_mac, SIZE_MAC);
 		memcpy(packet_send.header_eathernet.source_mac, source_mac, SIZE_MAC);
