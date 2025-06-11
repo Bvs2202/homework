@@ -38,6 +38,7 @@ int main()
 	socklen_t len_addr;
 	socklen_t len_packet;
 	int byte_in;
+	char *msg = "Привет клиент!";
 	char buff[SIZE_BUFF] = {0};
 	char dest_ip[SIZE_IP] = {0};
 	char *name_iface = "wlp4s0";
@@ -67,19 +68,9 @@ int main()
 			}
 		}
 
-		memset(buff, 0 , sizeof(buff));
-		strncpy(buff, packet_in->buff, sizeof(buff));
-		if (strlen(buff) + 3 >= SIZE_BUFF)
-		{
-			printf("Сообщение слишком большое!\n");
-			break;
-		}
+		strncpy(packet_send.buff, msg, sizeof(packet_send.buff));
 
-		snprintf(buff + 3, 3, "%s", " 1");
-
-		strncpy(packet_send.buff, buff, sizeof(packet_send.buff));
-
-		strncpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
+		memcpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
 		memcpy(dest_ip, &packet_in->header_ip.source_ip, SIZE_IP);
 
 		memcpy(packet_send.header_eathernet.dest_mac, dest_mac, SIZE_MAC);
@@ -120,7 +111,8 @@ int main()
 
 		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
 		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-		printf("%d %s\n", packet_send.header_ip.dest_ip, packet_send.buff);
+
+		printf("Содержимое пакета: %d %s\n", (int *)packet_send.header_ip.dest_ip, packet_send.buff);
 	}
 
 	close(sockfd);
