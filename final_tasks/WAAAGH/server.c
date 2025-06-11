@@ -63,7 +63,7 @@ int main()
 			packet_in = (struct packet *)(buff);
 			if (ntohs(packet_in->header_udp.dest_port) == PORT_SERVER)
 			{
-				printf("%s\n", packet_in->buff);
+				printf("port = %d, %s\n", packet_in->header_udp.source_port, packet_in->buff);
 				break;
 			}
 		}
