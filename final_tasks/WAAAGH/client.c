@@ -41,6 +41,7 @@ int main()
 
 	while (1)
 	{
+		memset(&packet_send, 0, sizeof(packet_send));
 		printf("Введите сообщение для сервера(нажмите 'q' для выхода): ");
 		fgets(packet_send.buff, sizeof(packet_send.buff), stdin);
 		packet_send.buff[strcspn(packet_send.buff, "\n")] = '\0';

@@ -41,6 +41,7 @@ int main()
 	char *msg = "Привет клиент!";
 	char buff[SIZE_BUFF] = {0};
 	char dest_ip[SIZE_IP] = {0};
+	char tmp_buff[SIZE_BUFF] = {0};
 	char *name_iface = "wlp4s0";
 	unsigned char dest_mac[SIZE_MAC];
 	unsigned char source_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
@@ -56,6 +57,9 @@ int main()
 
 	while (1)
 	{
+		memset(&packet_send, 0, sizeof(packet_send));
+
+		printf("Ожидаю сообщения от клиента!\n");
 		len_addr = sizeof(client_addr);
 		while(1)
 		{
@@ -112,7 +116,8 @@ int main()
 		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
 		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
-		printf("Содержимое пакета: %d %s\n", ntohs(packet_send.header_ip.dest_ip), packet_send.buff);
+		inet_ntop(AF_INET, &packet_send.header_ip.dest_ip, tmp_buff, INET_ADDRSTRLEN);
+		printf("Содержимое пакета: %s %s\n", tmp_buff, packet_send.buff);
 	}
 
 	close(sockfd);
