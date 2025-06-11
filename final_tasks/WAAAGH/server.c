@@ -18,7 +18,8 @@
 
 struct client_data {
 	int num;
-	char ip_client[SIZE_IP];
+	u_int32_t ip_client;
+	u_int16_t port_client;
 };
 
 struct list {
@@ -30,7 +31,8 @@ int sockfd = -1;
 
 int main()
 {
-	struct list *head;
+	struct list *head = NULL;
+	struct list *ptr_list;
 	struct list *list_client;
 	struct packet packet_send = {0};
 	struct packet *packet_in;
@@ -38,15 +40,15 @@ int main()
 	socklen_t len_addr;
 	socklen_t len_packet;
 	int byte_in;
-	char *msg = "Привет клиент!";
 	char buff[SIZE_BUFF] = {0};
-	char dest_ip[SIZE_IP] = {0};
+	u_int32_t dest_ip = {0};
 	char tmp_buff[SIZE_BUFF] = {0};
 	char *name_iface = "wlp4s0";
 	unsigned char dest_mac[SIZE_MAC];
 	unsigned char source_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
 	unsigned short *ptr_pct;
 	unsigned int csum = 0, tmp_csum = 0;
+	size_t len_str;
 
 	sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (sockfd == -1)
@@ -68,11 +70,36 @@ int main()
 			if (ntohs(packet_in->header_udp.dest_port) == PORT_SERVER)
 			{
 				printf("port = %d, %s\n", ntohs(packet_in->header_udp.source_port), packet_in->buff);
+
+				ptr_list = head;
+				while(ptr_list != NULL)
+				{
+					if (ptr_list->client.ip_client == ntohl(packet_in->header_ip.source_ip) 
+							&& ptr_list->client.port_client == ntohs(packet_in->header_udp.source_port))
+					{
+						ptr_list->client.num++;
+						goto step;
+					}
+					ptr_list = ptr_list->next;
+				}
+
+				list_client = malloc(sizeof(struct list));
+				memset(list_client, 0, sizeof(struct list));
+				list_client->client.ip_client = ntohl(packet_in->header_ip.source_ip);
+				list_client->client.port_client = ntohs(packet_in->header_udp.source_port);
+				list_client->client.num = 1;
+
+				list_client->next = head;
+				head = list_client;
+
+				step:
 				break;
 			}
 		}
 
-		strncpy(packet_send.buff, msg, sizeof(packet_send.buff));
+		strncpy(packet_send.buff, packet_in->buff, sizeof(packet_send.buff));
+		len_str = strlen(packet_send.buff);
+		snprintf(packet_send.buff + len_str, SIZE_BUFF - len_str, " %d", ptr_list->client.num);
 
 		memcpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
 		memcpy(dest_ip, &packet_in->header_ip.source_ip, SIZE_IP);
