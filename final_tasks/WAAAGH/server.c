@@ -63,7 +63,7 @@ int main()
 			packet_in = (struct packet *)(buff);
 			if (ntohs(packet_in->header_udp.dest_port) == PORT_SERVER)
 			{
-				printf("port = %d, %s\n", packet_in->header_udp.source_port, packet_in->buff);
+				printf("port = %d, %s\n", ntohs(packet_in->header_udp.source_port), packet_in->buff);
 				break;
 			}
 		}
@@ -101,7 +101,7 @@ int main()
 		packet_send.header_ip.checksum = (csum & 0xFFFF);
 
 		packet_send.header_udp.source_port = htons(PORT_SERVER);
-		packet_send.header_udp.dest_port = htons(packet_in->header_udp.source_port);
+		packet_send.header_udp.dest_port = packet_in->header_udp.source_port;
 		packet_send.header_udp.length = htons(sizeof(packet_send.header_udp) + strlen(packet_send.buff));
 
 		server_addr.sll_family = AF_PACKET;
@@ -112,7 +112,7 @@ int main()
 		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
 		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
-		printf("Содержимое пакета: %d %s\n", packet_send.header_ip.dest_ip, packet_send.buff);
+		printf("Содержимое пакета: %d %s\n", ntohs(packet_send.header_ip.dest_ip), packet_send.buff);
 	}
 
 	close(sockfd);
