@@ -1,18 +1,21 @@
+#include <arpa/inet.h>
+#include <errno.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <netpacket/packet.h>
+#include <netinet/if_ether.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <string.h>
-#include <unistd.h>
-#include <netinet/in.h>
 #include <signal.h>
-#include <arpa/inet.h>
-#include <netinet/if_ether.h>
-#include <linux/if_packet.h>
-#include <net/if.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #include "common.h"
 
-#define IP_SORCE "192.168.0.153"
+#define IP_SOURCE "192.168.0.153"
 
 #define MAX_CLIENT 36
 
@@ -24,17 +27,88 @@ struct client_data {
 
 struct list {
 	struct client_data client;
+	struct list *prev;
 	struct list *next;
 };
 
 int sockfd = -1;
+volatile sig_atomic_t stop = 0;
+
+
+int select_interface(char *iface_name, size_t name_len, unsigned char *mac, int *if_index)
+{
+	struct ifaddrs *ifaddr, *ifa;
+
+	if (getifaddrs(&ifaddr) == -1) {
+		perror("getifaddrs");
+		return -1;
+	}
+
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+
+		// Только AF_PACKET для MAC-адреса
+		if (ifa->ifa_addr->sa_family != AF_PACKET)
+			continue;
+
+		// Игнорируем loopback
+		if (ifa->ifa_flags & IFF_LOOPBACK)
+			continue;
+
+		// Интерфейс должен быть UP и RUNNING
+		if (!(ifa->ifa_flags & IFF_UP) || !(ifa->ifa_flags & IFF_RUNNING))
+			continue;
+
+		// Копируем имя интерфейса
+		strncpy(iface_name, ifa->ifa_name, name_len);
+
+		// Получаем MAC и индекс
+		int fd = socket(AF_INET, SOCK_DGRAM, 0);
+		if (fd < 0) {
+			perror("socket ioctl");
+			freeifaddrs(ifaddr);
+			return -1;
+		}
+
+		struct ifreq ifr;
+		strncpy(ifr.ifr_name, iface_name, IFNAMSIZ);
+
+		if (ioctl(fd, SIOCGIFHWADDR, &ifr) < 0) {
+			perror("ioctl get mac");
+			close(fd);
+			continue;
+		}
+		memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
+
+		if (ioctl(fd, SIOCGIFINDEX, &ifr) < 0) {
+			perror("ioctl get index");
+			close(fd);
+			continue;
+		}
+		*if_index = ifr.ifr_ifindex;
+
+		close(fd);
+		freeifaddrs(ifaddr);
+		return 0; // Успешно нашли подходящий интерфейс
+	}
+
+	freeifaddrs(ifaddr);
+	return -1; // Не найден подходящий интерфейс
+}
+
+void handle_sigint(int signum)
+{
+	stop = 1;
+}
 
 int main()
 {
+	struct sigaction sa = {0};
 	struct client_data *ptr_client_data = NULL;
-	struct list *head = NULL;
+	struct list *head;
 	struct list *ptr_list;
-	struct list *list_client;
+	struct list *new_list;
 	struct packet packet_send = {0};
 	struct packet *packet_in;
 	struct sockaddr_ll server_addr, client_addr;
@@ -42,14 +116,18 @@ int main()
 	socklen_t len_packet;
 	int byte_in;
 	char buff[SIZE_BUFF] = {0};
-	u_int32_t dest_ip = {0};
 	char tmp_buff[SIZE_BUFF] = {0};
 	char *name_iface = "wlp4s0";
 	unsigned char dest_mac[SIZE_MAC];
 	unsigned char source_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
 	unsigned short *ptr_pct;
-	unsigned int csum = 0, tmp_csum = 0;
+	unsigned int csum = 0;
 	size_t len_str;
+
+	sa.sa_handler = handle_sigint;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sigaction(SIGINT, &sa, NULL);
 
 	sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (sockfd == -1)
@@ -58,7 +136,16 @@ int main()
 		exit(1);
 	}
 
-	while (1)
+	head = calloc(1, sizeof(struct list));
+	if (head == NULL)
+	{
+		perror("calloc head");
+		return 1;
+	}
+	head->next = head;
+	head->prev = head;
+
+	while (stop != 1)
 	{
 		memset(&packet_send, 0, sizeof(packet_send));
 
@@ -69,35 +156,97 @@ int main()
 			ptr_client_data = NULL;
 
 			byte_in = recvfrom(sockfd, &buff, sizeof(buff), 0, (struct sockaddr *)&client_addr, &len_addr);
+			if (byte_in < 0)
+			{
+				if (errno == EINTR)
+				{
+					break;
+				}
+				perror("recvfrom");
+				continue;
+			}
+
 			packet_in = (struct packet *)(buff);
 			if (ntohs(packet_in->header_udp.dest_port) == PORT_SERVER)
 			{
 				printf("port = %d, %s\n", ntohs(packet_in->header_udp.source_port), packet_in->buff);
 
-				for (ptr_list = head; ptr_list != NULL; ptr_list = ptr_list->next)
+				if (strcmp(packet_in->buff, EXIT_CLIENT) == 0)
+				{
+					ptr_list = head->next;
+					while (ptr_list != head)
+					{
+						if (ptr_list->client.ip_client == ntohl(packet_in->header_ip.source_ip)
+							&& ptr_list->client.port_client == ntohs(packet_in->header_udp.source_port))
+						{
+							ptr_list->prev->next = ptr_list->next;
+							ptr_list->next->prev = ptr_list->prev;
+
+							free(ptr_list);
+							break;
+						}
+						ptr_list = ptr_list->next;
+					}
+					continue;
+				}
+
+				for (ptr_list = head->next; ptr_list != head; ptr_list = ptr_list->next)
 				{
 					if (ptr_list->client.ip_client == ntohl(packet_in->header_ip.source_ip)
 							&& ptr_list->client.port_client == ntohs(packet_in->header_udp.source_port))
 					{
 						ptr_list->client.num++;
 						ptr_client_data = &ptr_list->client;
-					break;
+						break;
 					}
 				}
 
 				if (!ptr_client_data)
 				{
-					list_client = calloc(1, sizeof(*list_client));
-					list_client->client.ip_client = ntohl(packet_in->header_ip.source_ip);
-					list_client->client.port_client = ntohs(packet_in->header_udp.source_port);
-					list_client->client.num = 1;
-					list_client->next = head;
-					head = list_client;
-					ptr_client_data = &list_client->client;
+					new_list = calloc(1, sizeof(*new_list));
+					if (!new_list)
+					{
+						perror("calloc new list");
+						ptr_list = head->next;
+						while (ptr_list != head)
+						{
+							struct list *next = ptr_list->next;
+							free(ptr_list);
+							ptr_list = next;
+						}
+					
+						free(head);
+						return 1;
+					}
+
+					new_list->client.ip_client = ntohl(packet_in->header_ip.source_ip);
+					new_list->client.port_client = ntohs(packet_in->header_udp.source_port);
+					new_list->client.num = 1;
+
+					new_list->next = head;
+					new_list->prev = head->prev;
+					head->prev->next = new_list;
+					head->prev = new_list;
+
+					ptr_client_data = &new_list->client;
 				}
 
 				break;
 			}
+		}
+		if (stop == 1)
+		{
+			ptr_list = head->next;
+			while (ptr_list != head)
+			{
+				struct list *next = ptr_list->next;
+				free(ptr_list);
+				ptr_list = next;
+			}
+
+			free(head);
+
+			break;
 		}
 
 		strncpy(packet_send.buff, packet_in->buff, sizeof(packet_send.buff));
@@ -105,7 +254,6 @@ int main()
 		snprintf(packet_send.buff + len_str, SIZE_BUFF - len_str, " %d", ptr_client_data->num);
 
 		memcpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
-		memcpy(&dest_ip, &packet_in->header_ip.source_ip, SIZE_IP);
 
 		memcpy(packet_send.header_eathernet.dest_mac, dest_mac, SIZE_MAC);
 		memcpy(packet_send.header_eathernet.source_mac, source_mac, SIZE_MAC);
@@ -120,17 +268,17 @@ int main()
 		packet_send.header_ip.transport_proto = IPPROTO_UDP;
 		packet_send.header_ip.dest_ip = packet_in->header_ip.source_ip;
 
-		if (inet_pton(AF_INET, IP_SORCE, &packet_send.header_ip.source_ip) <= 0)
+		if (inet_pton(AF_INET, IP_SOURCE, &packet_send.header_ip.source_ip) <= 0)
 		{
 			perror("inet_pton");
 		}
+		csum = 0;
 		ptr_pct = (unsigned short *)&packet_send.header_ip;
 		for (int i = 0; i < 10; i++)
 		{
 			csum = csum + ptr_pct[i];
 		}
-		tmp_csum = csum >> 16;
-		csum = (csum & 0xFFFF) + tmp_csum;
+		csum = (csum & 0xFFFF) + (csum >> 16);
 		csum = ~csum;
 		packet_send.header_ip.checksum = (csum & 0xFFFF);
 

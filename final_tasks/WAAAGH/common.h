@@ -10,6 +10,8 @@
 #define PORT_SERVER 8080
 #define PORT_CLIENT 7777
 
+#define EXIT_CLIENT "q"
+
 #define SIZE_BUFF 256
 
 struct header_eathernet {
