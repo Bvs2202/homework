@@ -124,6 +124,8 @@ int main()
 						}
 						ptr_list = ptr_list->next;
 					}
+					printf("Клиент удален из списка!\n");
+
 					continue;
 				}
 
@@ -236,6 +238,7 @@ int main()
 	}
 
 	close(sockfd);
+	printf("\nЗавершение работы сервера!\n");
 
 	return 0;
 }
