@@ -34,69 +34,6 @@ struct list {
 int sockfd = -1;
 volatile sig_atomic_t stop = 0;
 
-
-int select_interface(char *iface_name, size_t name_len, unsigned char *mac, int *if_index)
-{
-	struct ifaddrs *ifaddr, *ifa;
-
-	if (getifaddrs(&ifaddr) == -1) {
-		perror("getifaddrs");
-		return -1;
-	}
-
-	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr == NULL)
-			continue;
-
-		// Только AF_PACKET для MAC-адреса
-		if (ifa->ifa_addr->sa_family != AF_PACKET)
-			continue;
-
-		// Игнорируем loopback
-		if (ifa->ifa_flags & IFF_LOOPBACK)
-			continue;
-
-		// Интерфейс должен быть UP и RUNNING
-		if (!(ifa->ifa_flags & IFF_UP) || !(ifa->ifa_flags & IFF_RUNNING))
-			continue;
-
-		// Копируем имя интерфейса
-		strncpy(iface_name, ifa->ifa_name, name_len);
-
-		// Получаем MAC и индекс
-		int fd = socket(AF_INET, SOCK_DGRAM, 0);
-		if (fd < 0) {
-			perror("socket ioctl");
-			freeifaddrs(ifaddr);
-			return -1;
-		}
-
-		struct ifreq ifr;
-		strncpy(ifr.ifr_name, iface_name, IFNAMSIZ);
-
-		if (ioctl(fd, SIOCGIFHWADDR, &ifr) < 0) {
-			perror("ioctl get mac");
-			close(fd);
-			continue;
-		}
-		memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
-
-		if (ioctl(fd, SIOCGIFINDEX, &ifr) < 0) {
-			perror("ioctl get index");
-			close(fd);
-			continue;
-		}
-		*if_index = ifr.ifr_ifindex;
-
-		close(fd);
-		freeifaddrs(ifaddr);
-		return 0; // Успешно нашли подходящий интерфейс
-	}
-
-	freeifaddrs(ifaddr);
-	return -1; // Не найден подходящий интерфейс
-}
-
 void handle_sigint(int signum)
 {
 	stop = 1;
