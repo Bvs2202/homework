@@ -46,19 +46,19 @@ int main()
 	struct list *head;
 	struct list *ptr_list;
 	struct list *new_list;
-	struct packet packet_send = {0};
-	struct packet *packet_in;
+	struct ethernet_frame packet_send = {0};
+	struct ethernet_frame *packet_in;
 	struct sockaddr_ll server_addr, client_addr;
-	socklen_t len_addr;
-	socklen_t len_packet;
-	int byte_in;
-	char buff[SIZE_BUFF] = {0};
+	socklen_t peer_addr_len;
+	socklen_t tx_pkt_len;
+	int recv_len;
+	char recv_buff[SIZE_BUFF] = {0};
 	char tmp_buff[SIZE_BUFF] = {0};
 	char *name_iface = "wlp4s0";
-	unsigned char dest_mac[SIZE_MAC];
-	unsigned char source_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
-	unsigned short *ptr_pct;
-	unsigned int csum = 0;
+	unsigned char dst_mac[SIZE_MAC];
+	unsigned char src_mac[SIZE_MAC] = {0x0c, 0x8b, 0xfd, 0x05, 0xed, 0xf3};
+	unsigned short *ip_hdr_words = NULL;
+	unsigned int ip_csum = 0;
 	size_t len_str;
 
 	sa.sa_handler = handle_sigint;
@@ -87,13 +87,13 @@ int main()
 		memset(&packet_send, 0, sizeof(packet_send));
 
 		printf("Ожидаю сообщения от клиента!\n");
-		len_addr = sizeof(client_addr);
+		peer_addr_len = sizeof(client_addr);
 		while(1)
 		{
 			ptr_client_data = NULL;
 
-			byte_in = recvfrom(sockfd, &buff, sizeof(buff), 0, (struct sockaddr *)&client_addr, &len_addr);
-			if (byte_in < 0)
+			recv_len = recvfrom(sockfd, &recv_buff, sizeof(recv_buff), 0, (struct sockaddr *)&client_addr, &peer_addr_len);
+			if (recv_len < 0)
 			{
 				if (errno == EINTR)
 				{
@@ -103,7 +103,7 @@ int main()
 				continue;
 			}
 
-			packet_in = (struct packet *)(buff);
+			packet_in = (struct ethernet_frame *)(recv_buff);
 			if (ntohs(packet_in->header_udp.dest_port) == PORT_SERVER)
 			{
 				printf("port_client = %d, сообщение клиента: %s\n", ntohs(packet_in->header_udp.source_port), packet_in->buff);
@@ -190,11 +190,11 @@ int main()
 		len_str = strlen(packet_send.buff);
 		snprintf(packet_send.buff + len_str, SIZE_BUFF - len_str, " %d", ptr_client_data->num);
 
-		memcpy(dest_mac, packet_in->header_eathernet.source_mac, SIZE_MAC);
+		memcpy(dst_mac, packet_in->header_ethernet.src_mac, SIZE_MAC);
 
-		memcpy(packet_send.header_eathernet.dest_mac, dest_mac, SIZE_MAC);
-		memcpy(packet_send.header_eathernet.source_mac, source_mac, SIZE_MAC);
-		packet_send.header_eathernet.type = htons(ETH_P_IP);
+		memcpy(packet_send.header_ethernet.dst_mac, dst_mac, SIZE_MAC);
+		memcpy(packet_send.header_ethernet.src_mac, src_mac, SIZE_MAC);
+		packet_send.header_ethernet.type = htons(ETH_P_IP);
 
 		packet_send.header_ip.version_len = 4 << 4 | 5;
 		packet_send.header_ip.ds = 0;
@@ -209,15 +209,15 @@ int main()
 		{
 			perror("inet_pton");
 		}
-		csum = 0;
-		ptr_pct = (unsigned short *)&packet_send.header_ip;
+		ip_csum = 0;
+		ip_hdr_words = (unsigned short *)&packet_send.header_ip;
 		for (int i = 0; i < 10; i++)
 		{
-			csum = csum + ptr_pct[i];
+			ip_csum = ip_csum + ip_hdr_words[i];
 		}
-		csum = (csum & 0xFFFF) + (csum >> 16);
-		csum = ~csum;
-		packet_send.header_ip.checksum = (csum & 0xFFFF);
+		ip_csum = (ip_csum & 0xFFFF) + (ip_csum >> 16);
+		ip_csum = ~ip_csum;
+		packet_send.header_ip.ip_checksum = (ip_csum & 0xFFFF);
 
 		packet_send.header_udp.source_port = htons(PORT_SERVER);
 		packet_send.header_udp.dest_port = packet_in->header_udp.source_port;
@@ -225,11 +225,11 @@ int main()
 
 		server_addr.sll_family = AF_PACKET;
 		server_addr.sll_halen = SIZE_ADDR_SLL;
-		memcpy(server_addr.sll_addr, dest_mac, SIZE_MAC);
+		memcpy(server_addr.sll_addr, dst_mac, SIZE_MAC);
 		server_addr.sll_ifindex = if_nametoindex("wlp4s0");
 
-		len_packet = sizeof(struct header_eathernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
-		sendto(sockfd, &packet_send, len_packet, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+		tx_pkt_len = sizeof(struct header_ethernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(packet_send.buff);
+		sendto(sockfd, &packet_send, tx_pkt_len, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
 
 		inet_ntop(AF_INET, &packet_send.header_ip.dest_ip, tmp_buff, INET_ADDRSTRLEN);
 		printf("Содержимое пакета: %s %s\n", tmp_buff, packet_send.buff);
