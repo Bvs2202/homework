@@ -106,7 +106,7 @@ int main()
 			packet_in = (struct packet *)(buff);
 			if (ntohs(packet_in->header_udp.dest_port) == PORT_SERVER)
 			{
-				printf("port = %d, %s\n", ntohs(packet_in->header_udp.source_port), packet_in->buff);
+				printf("port_client = %d, сообщение клиента: %s\n", ntohs(packet_in->header_udp.source_port), packet_in->buff);
 
 				if (strcmp(packet_in->buff, EXIT_CLIENT) == 0)
 				{

@@ -21,7 +21,7 @@ int main()
 {
 	struct packet packet_send = {0};
 	struct packet *packet_in;
-	struct sockaddr_ll server_addr, client_addr;
+	struct sockaddr_ll server_addr;
 	socklen_t len_addr;
 	socklen_t len_packet;
 	int byte_in;
@@ -95,6 +95,7 @@ int main()
 
 		if (strcmp(packet_send.buff, "q") == 0)
 		{
+			printf("Завершение работы!\n");
 			break;
 		}
 
