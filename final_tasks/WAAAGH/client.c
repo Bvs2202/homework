@@ -85,7 +85,7 @@ int main()
 		peer_addr.sll_family = AF_PACKET;
 		peer_addr.sll_halen = SIZE_ADDR_SLL;
 		memcpy(peer_addr.sll_addr, dst_mac, SIZE_MAC);
-		peer_addr.sll_ifindex = if_nametoindex(name_iface);
+		peer_addr.sll_ifindex = if_nametoindex(name_iface);	
 
 
 		len_packet = sizeof(struct header_ethernet) + sizeof(struct header_ip) + sizeof(struct header_udp) + strlen(tx_pkt.buff);
