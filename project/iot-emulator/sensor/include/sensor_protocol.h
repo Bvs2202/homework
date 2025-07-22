@@ -1,6 +1,7 @@
-#ifndef SMART_HOME_PROTOCOL_H
-#define SMART_HOME_PROTOCOL_H
+#ifndef SENSOR_PROTOCOL_H
+#define SENSOR_PROTOCOL_H
 
+#include <stdio.h>
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <linux/if_packet.h>
@@ -19,11 +20,6 @@
 
 #define SIZE_PAYLOAD 64
 
-#define ON_LIGHT 0
-#define OFF_LIGHT 1
-#define ON_ALL 2
-#define OFF_ALL 3
-
 struct ETH {
 	unsigned char h_dest[ETH_ALEN];
 	unsigned char h_source[ETH_ALEN];
@@ -41,7 +37,7 @@ struct IP {
 	uint16_t check;
 	uint32_t saddr;
 	uint32_t daddr;
-};
+}__attribute__((packed));
 
 struct TCP {
 	uint16_t source;
@@ -60,12 +56,12 @@ struct UDP {
 	uint16_t dest;
 	uint16_t len;
 	uint16_t check;
-};
+}__attribute__((packed));
 
 union TransferHead {
 	struct UDP udp;
 	struct TCP tcp;
-};
+}__attribute__((packed));
 
 #pragma pack(push, 1)
 struct packet {
@@ -76,16 +72,4 @@ struct packet {
 };
 #pragma pack(pop)
 
-unsigned short checksum(struct IP *);
-
-void swap_mac_address(struct packet *);
-void swap_ip_address(struct packet *);
-void swap_udp_ports(struct packet *);
-void swap_tcp_ports(struct packet *);
-
-int get_interface_mac(const char *, unsigned char *);
-int parse_mac(const char *str, unsigned char *mac);
-
-
-void write_log(const struct packet *pkt, int fd);
 #endif

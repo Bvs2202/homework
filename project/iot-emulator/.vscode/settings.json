@@ -1,0 +1,8 @@
+{
+	"files.associations": {
+		"smart_home.h": "c",
+		"socket.h": "c",
+		"stdio.h": "c",
+		"sensor_protocol.h": "c"
+	}
+}
